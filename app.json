@@ -4,6 +4,7 @@
     "slug": "ta-vivo-ainda",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
+    "scheme": "ta-vivo-ainda",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -28,6 +29,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }
