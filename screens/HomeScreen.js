@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@ta_vivo_ainda:last_pressed';
 const MODE_STORAGE_KEY = '@ta_vivo_ainda:view_mode';
+const WEBHOOK_URL = 'https://n8n-api.balancesolutions.com.br/webhook/1dd7f200-5b2d-4028-8e66-a09666bb6897';
 
 export default function HomeScreen({ user, onLogout, onOpenProfile }) {
   const [lastPressedDate, setLastPressedDate] = useState(null);
@@ -105,6 +106,83 @@ export default function HomeScreen({ user, onLogout, onOpenProfile }) {
     );
   };
 
+  const handleTestWebhook = async () => {
+    try {
+      // Carregar perfil
+      const profile = await AsyncStorage.getItem('@ta_vivo_ainda:profile');
+      const profileData = profile ? JSON.parse(profile) : {};
+      
+      // Preparar dados de teste
+      const testData = {
+        userId: user?.email || 'test@email.com',
+        userName: profileData.name || user?.name || 'Usuário Teste',
+        emergencyContact: profileData.emergencyContact || 'Contato Teste',
+        emergencyPhone: profileData.emergencyPhone || '5511999999999',
+        lastConfirmation: lastPressedDate ? lastPressedDate.toISOString() : new Date().toISOString(),
+        daysWithoutConfirmation: lastPressedDate ? Math.floor((new Date() - lastPressedDate) / (1000 * 60 * 60 * 24)) : 0,
+        timestamp: new Date().toISOString(),
+        test: true, // Flag para identificar que é um teste
+      };
+
+      Alert.alert('Enviando...', 'Enviando dados para o webhook...');
+
+      // Tentar POST primeiro
+      try {
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(testData),
+        });
+
+        if (response.ok) {
+          const responseData = await response.text();
+          Alert.alert(
+            '✓ Sucesso!',
+            `Webhook recebido com sucesso!\n\nDados enviados:\n${JSON.stringify(testData, null, 2)}`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      } catch (postError) {
+        console.log('POST falhou, tentando GET...', postError);
+      }
+
+      // Se POST falhar, tentar GET com query params
+      const queryParams = new URLSearchParams({
+        userId: testData.userId,
+        userName: testData.userName,
+        emergencyContact: testData.emergencyContact,
+        emergencyPhone: testData.emergencyPhone,
+        lastConfirmation: testData.lastConfirmation,
+        daysWithoutConfirmation: testData.daysWithoutConfirmation.toString(),
+        timestamp: testData.timestamp,
+        test: 'true',
+      });
+
+      const getResponse = await fetch(`${WEBHOOK_URL}?${queryParams}`, {
+        method: 'GET',
+      });
+
+      if (getResponse.ok) {
+        Alert.alert(
+          '✓ Sucesso!',
+          `Webhook recebido via GET!\n\nDados enviados:\n${JSON.stringify(testData, null, 2)}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        throw new Error(`Erro: ${getResponse.status}`);
+      }
+    } catch (error) {
+      console.error('Erro ao testar webhook:', error);
+      Alert.alert(
+        'Erro',
+        `Não foi possível enviar para o webhook:\n${error.message}\n\nVerifique a URL e a configuração do n8n.`
+      );
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
@@ -152,6 +230,15 @@ export default function HomeScreen({ user, onLogout, onOpenProfile }) {
             <Text style={styles.infoLabel}>Última confirmação:</Text>
             <Text style={styles.infoText}>{formatDate(lastPressedDate)}</Text>
           </View>
+        )}
+
+        {!isSimplifiedMode && (
+          <TouchableOpacity
+            style={styles.testButton}
+            onPress={handleTestWebhook}
+          >
+            <Text style={styles.testButtonText}>Teste Webhook</Text>
+          </TouchableOpacity>
         )}
 
         <TouchableOpacity
@@ -396,5 +483,25 @@ const styles = StyleSheet.create({
     color: '#666',
     marginRight: 8,
     fontWeight: '500',
+  },
+  testButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginBottom: 20,
+    shadowColor: '#FF9800',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
